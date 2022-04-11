@@ -20,11 +20,11 @@ type Pool struct {
 	conn  map[any]*Conn
 }
 
-func (a *Pool) Range(f func(any, *Conn) bool) {
+func (a *Pool) Range(f func(*Conn) bool) {
 	a.RLock()
 	defer a.RUnlock()
-	for k, v := range a.conn {
-		if !f(k, v) {
+	for _, v := range a.conn {
+		if !f(v) {
 			break
 		}
 	}
