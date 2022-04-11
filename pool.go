@@ -44,8 +44,8 @@ func (a *Pool) NewConn(c *gin.Context, key any, resHeader http.Header) (*Conn, e
 	}
 	conn := &Conn{
 		Conn: ws,
-		pool: a,
-		key:  key,
+		Pool: a,
+		Key:  key,
 	}
 	a.Lock()
 	_, ok := a.conn[key]

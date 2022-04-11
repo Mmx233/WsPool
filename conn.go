@@ -9,8 +9,8 @@ import (
 type Conn struct {
 	*websocket.Conn
 	sync.Mutex
-	pool *Pool
-	key  any
+	Pool *Pool
+	Key  any
 }
 
 func (a *Conn) WriteJSON(v interface{}) error {
@@ -38,16 +38,16 @@ func (a *Conn) WritePreparedMessage(pm *websocket.PreparedMessage) error {
 }
 
 func (a *Conn) Clear() error {
-	a.pool.Lock()
-	ws, ok := a.pool.conn[a.key]
+	a.Pool.Lock()
+	ws, ok := a.Pool.conn[a.Key]
 	if ok && ws == a {
-		delete(a.pool.conn, a.key)
-		a.pool.Unlock()
+		delete(a.Pool.conn, a.Key)
+		a.Pool.Unlock()
 		a.Lock()
 		defer a.Unlock()
 		return a.Close()
 	} else {
-		a.pool.Unlock()
+		a.Pool.Unlock()
 	}
 	return nil
 }
