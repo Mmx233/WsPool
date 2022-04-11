@@ -1,4 +1,4 @@
-package ws
+package pool
 
 import (
 	"github.com/gin-gonic/gin"
