@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"container/list"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"net/http"
@@ -9,58 +10,69 @@ import (
 
 func NewPool(upper *websocket.Upgrader) *Pool {
 	return &Pool{
-		conn:  make(map[any]*Conn),
-		upper: upper,
+		List:  list.New(),
+		Upper: upper,
 	}
 }
 
 type Pool struct {
 	sync.RWMutex
-	upper *websocket.Upgrader
-	conn  map[any]*Conn
+	Upper *websocket.Upgrader
+	List  *list.List
 }
 
 func (a *Pool) Len() int {
 	a.RLock()
 	defer a.RUnlock()
-	return len(a.conn)
+	return a.List.Len()
 }
 
 func (a *Pool) Range(f func(*Conn) bool) {
 	a.RLock()
 	defer a.RUnlock()
-	for _, v := range a.conn {
-		if !f(v) {
+	e := a.List.Front()
+	for e != nil {
+		if !f(e.Value.(*Conn)) {
 			break
 		}
+		e = e.Next()
 	}
 }
 
 func (a *Pool) Load(key any) (*Conn, bool) {
 	a.RLock()
 	defer a.RUnlock()
-	conn, ok := a.conn[key]
-	return conn, ok
+	var conn *Conn
+	e := a.List.Front()
+	for e != nil {
+		if conn = e.Value.(*Conn); conn.Key == key {
+			return conn, true
+		}
+		e = e.Next()
+	}
+	return nil, false
 }
 
 func (a *Pool) NewConn(c *gin.Context, key any, resHeader http.Header) (*Conn, error) {
-	ws, e := a.upper.Upgrade(c.Writer, c.Request, resHeader)
+	ws, e := a.Upper.Upgrade(c.Writer, c.Request, resHeader)
 	if e != nil {
 		return nil, e
+	}
+	a.Lock()
+	defer a.Unlock()
+	old, ok := a.Load(key)
+	if ok {
+		old.Lock()
+		_ = old.Conn.Close()
+		a.List.Remove(old.Element)
+		old.Element.Value = nil
+		old.Unlock()
 	}
 	conn := &Conn{
 		Conn: ws,
 		Pool: a,
 		Key:  key,
 	}
-	a.Lock()
-	_, ok := a.conn[key]
-	if ok {
-		a.conn[key].Lock()
-		_ = a.conn[key].Conn.Close()
-		a.conn[key].Unlock()
-	}
-	a.conn[key] = conn
-	a.Unlock()
+	conn.Element = a.List.PushBack(conn)
 	return conn, nil
 }
