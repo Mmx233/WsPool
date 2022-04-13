@@ -39,9 +39,7 @@ func (a *Pool) Range(f func(*Conn) bool) {
 	}
 }
 
-func (a *Pool) Load(key any) (*Conn, bool) {
-	a.RLock()
-	defer a.RUnlock()
+func (a *Pool) load(key any) (*Conn, bool) {
 	var conn *Conn
 	e := a.List.Front()
 	for e != nil {
@@ -53,6 +51,12 @@ func (a *Pool) Load(key any) (*Conn, bool) {
 	return nil, false
 }
 
+func (a *Pool) Load(key any) (*Conn, bool) {
+	a.RLock()
+	defer a.RUnlock()
+	return a.load(key)
+}
+
 func (a *Pool) NewConn(c *gin.Context, key any, resHeader http.Header) (*Conn, error) {
 	ws, e := a.Upper.Upgrade(c.Writer, c.Request, resHeader)
 	if e != nil {
@@ -60,7 +64,7 @@ func (a *Pool) NewConn(c *gin.Context, key any, resHeader http.Header) (*Conn, e
 	}
 	a.Lock()
 	defer a.Unlock()
-	old, ok := a.Load(key)
+	old, ok := a.load(key)
 	if ok {
 		old.Lock()
 		_ = old.Conn.Close()
