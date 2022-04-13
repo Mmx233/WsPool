@@ -20,6 +20,12 @@ type Pool struct {
 	conn  map[any]*Conn
 }
 
+func (a *Pool) Len() int {
+	a.RLock()
+	defer a.RUnlock()
+	return len(a.conn)
+}
+
 func (a *Pool) Range(f func(*Conn) bool) {
 	a.RLock()
 	defer a.RUnlock()
