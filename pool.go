@@ -39,7 +39,7 @@ func (a *Pool) Range(f func(*Conn) bool) {
 	}
 }
 
-func (a *Pool) load(key any) (*Conn, bool) {
+func (a *Pool) DoLoad(key any) (*Conn, bool) {
 	var conn *Conn
 	e := a.List.Front()
 	for e != nil {
@@ -54,21 +54,25 @@ func (a *Pool) load(key any) (*Conn, bool) {
 func (a *Pool) Load(key any) (*Conn, bool) {
 	a.RLock()
 	defer a.RUnlock()
-	return a.load(key)
+	return a.DoLoad(key)
+}
+
+func (a *Pool) DoConnect(c *gin.Context, key any, resHeader http.Header) (*Conn, error) {
+	ws, e := a.Upper.Upgrade(c.Writer, c.Request, resHeader)
+	return &Conn{
+		Conn: ws,
+		Pool: a,
+		Key:  key,
+	}, e
 }
 
 func (a *Pool) NewConn(c *gin.Context, key any, resHeader http.Header) (*Conn, error) {
-	ws, e := a.Upper.Upgrade(c.Writer, c.Request, resHeader)
+	conn, e := a.DoConnect(c, key, resHeader)
 	if e != nil {
 		return nil, e
 	}
 	a.Lock()
 	defer a.Unlock()
-	conn := &Conn{
-		Conn: ws,
-		Pool: a,
-		Key:  key,
-	}
 	conn.Element = a.List.PushBack(conn)
 	return conn, nil
 }

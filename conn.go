@@ -40,29 +40,22 @@ func (a *Conn) WritePreparedMessage(pm *websocket.PreparedMessage) error {
 	return a.Conn.WritePreparedMessage(pm)
 }
 
-func (a *Conn) Clear() error {
-	defer func() {
-		if a.OnClose != nil {
-			a.OnClose(a)
-		}
-	}()
-	a.Lock()
-	ok := a.Element.Value == nil
-	a.Unlock()
-	if !ok {
-		a.Pool.Lock()
-		a.Pool.List.Remove(a.Element)
-		a.Pool.Unlock()
-		a.Lock()
-		a.Element.Value = nil
-		a.Unlock()
-		return a.Close()
+func (a *Conn) DoClear() error {
+	if a.Element.Value == nil {
+		return nil
 	}
-	return nil
+	if a.OnClose != nil {
+		defer a.OnClose(a)
+	}
+	a.Pool.Lock()
+	a.Pool.List.Remove(a.Element)
+	a.Pool.Unlock()
+	a.Element.Value = nil
+	return a.Close()
 }
 
-func (a *Conn) InPool() bool {
+func (a *Conn) Clear() error {
 	a.Lock()
 	defer a.Unlock()
-	return a.Element != nil
+	return a.DoClear()
 }
