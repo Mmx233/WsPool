@@ -12,7 +12,7 @@ type Conn struct {
 	sync.Mutex
 	Pool    *Pool
 	Key     any
-	onClose func(conn *Conn)
+	OnClose func(conn *Conn)
 	Element *list.Element
 }
 
@@ -42,11 +42,9 @@ func (a *Conn) WritePreparedMessage(pm *websocket.PreparedMessage) error {
 
 func (a *Conn) Clear() error {
 	defer func() {
-		a.Lock()
-		if a.onClose != nil {
-			a.onClose(a)
+		if a.OnClose != nil {
+			a.OnClose(a)
 		}
-		a.Unlock()
 	}()
 	a.Lock()
 	ok := a.Element.Value == nil
@@ -61,12 +59,6 @@ func (a *Conn) Clear() error {
 		return a.Close()
 	}
 	return nil
-}
-
-func (a *Conn) OnClose(e func(conn *Conn)) {
-	a.Lock()
-	defer a.Unlock()
-	a.onClose = e
 }
 
 func (a *Conn) InPool() bool {
