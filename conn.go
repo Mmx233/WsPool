@@ -41,9 +41,13 @@ func (a *Conn) WritePreparedMessage(pm *websocket.PreparedMessage) error {
 }
 
 func (a *Conn) Clear() error {
-	if a.onClose != nil {
-		defer a.onClose(a)
-	}
+	defer func() {
+		a.Lock()
+		if a.onClose != nil {
+			a.onClose(a)
+		}
+		a.Unlock()
+	}()
 	a.Lock()
 	ok := a.Element.Value == nil
 	a.Unlock()
@@ -60,6 +64,8 @@ func (a *Conn) Clear() error {
 }
 
 func (a *Conn) OnClose(e func(conn *Conn)) {
+	a.Lock()
+	defer a.Unlock()
 	a.onClose = e
 }
 
