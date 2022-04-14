@@ -64,14 +64,6 @@ func (a *Pool) NewConn(c *gin.Context, key any, resHeader http.Header) (*Conn, e
 	}
 	a.Lock()
 	defer a.Unlock()
-	old, ok := a.load(key)
-	if ok {
-		old.Lock()
-		_ = old.Conn.Close()
-		a.List.Remove(old.Element)
-		old.Element.Value = nil
-		old.Unlock()
-	}
 	conn := &Conn{
 		Conn: ws,
 		Pool: a,
