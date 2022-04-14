@@ -62,3 +62,9 @@ func (a *Conn) Clear() error {
 func (a *Conn) OnClose(e func(conn *Conn)) {
 	a.onClose = e
 }
+
+func (a *Conn) InPool() bool {
+	a.Lock()
+	defer a.Unlock()
+	return a.Element != nil
+}
