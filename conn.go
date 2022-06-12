@@ -3,6 +3,7 @@ package pool
 import (
 	"container/list"
 	"github.com/gorilla/websocket"
+	"io"
 	"sync"
 	"time"
 )
@@ -14,6 +15,18 @@ type Conn struct {
 	Key     any
 	OnClose func(conn *Conn)
 	Element *list.Element
+}
+
+func (a *Conn) WriteReader(messageType int, r io.Reader) error {
+	a.Lock()
+	defer a.Unlock()
+	w, e := a.Conn.NextWriter(messageType)
+	if e != nil {
+		return e
+	}
+	defer w.Close()
+	_, e = io.Copy(w, r)
+	return e
 }
 
 func (a *Conn) WriteJSON(v interface{}) error {

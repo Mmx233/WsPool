@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-func NewPool(upper *websocket.Upgrader) *Pool {
+func New(upper *websocket.Upgrader) *Pool {
 	return &Pool{
 		List:  list.New(),
 		Upper: upper,
