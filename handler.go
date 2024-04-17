@@ -19,11 +19,11 @@ func MsgHandler(conn *Conn, handler func(msgType int, r io.Reader)) {
 		}(conn)
 
 		for {
-			t, r, e := conn.NextReader()
-			if e != nil {
+			messageType, reader, err := conn.NextReader()
+			if err != nil {
 				return
 			}
-			handler(t, r)
+			handler(messageType, reader)
 		}
 	}()
 }

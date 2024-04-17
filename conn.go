@@ -20,13 +20,13 @@ type Conn struct {
 func (a *Conn) WriteReader(messageType int, r io.Reader) error {
 	a.Lock()
 	defer a.Unlock()
-	w, e := a.Conn.NextWriter(messageType)
-	if e != nil {
-		return e
+	w, err := a.Conn.NextWriter(messageType)
+	if err != nil {
+		return err
 	}
 	defer w.Close()
-	_, e = io.Copy(w, r)
-	return e
+	_, err = io.Copy(w, r)
+	return err
 }
 
 func (a *Conn) WriteJSON(v interface{}) error {
