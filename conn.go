@@ -1,7 +1,6 @@
 package pool
 
 import (
-	"container/list"
 	"github.com/gorilla/websocket"
 	"io"
 	"sync"
@@ -11,10 +10,12 @@ import (
 type Conn struct {
 	*websocket.Conn
 	sync.Mutex
-	Pool    *Pool
-	Key     any
+
+	Pool   *Pool
+	Key    any
+	Closed bool
+
 	OnClose func(conn *Conn)
-	Element *list.Element
 }
 
 func (a *Conn) WriteReader(messageType int, r io.Reader) error {
@@ -54,16 +55,14 @@ func (a *Conn) WritePreparedMessage(pm *websocket.PreparedMessage) error {
 }
 
 func (a *Conn) DoClear() bool {
-	if a.Element.Value == nil {
+	if a.Closed {
 		return false
 	}
 	if a.OnClose != nil {
 		defer a.OnClose(a)
 	}
-	a.Pool.Lock()
-	a.Pool.List.Remove(a.Element)
-	a.Pool.Unlock()
-	a.Element.Value = nil
+	a.Pool.length.Add(-1)
+	a.Closed = true
 	_ = a.Close()
 	return true
 }

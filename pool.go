@@ -1,78 +1,60 @@
 package pool
 
 import (
-	"container/list"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"net/http"
 	"sync"
+	"sync/atomic"
 )
 
 func New(upper *websocket.Upgrader) *Pool {
 	return &Pool{
-		List:  list.New(),
-		Upper: upper,
+		Upper:  upper,
+		pool:   &sync.Map{},
+		length: &atomic.Int64{},
 	}
 }
 
 type Pool struct {
-	sync.RWMutex
-	Upper *websocket.Upgrader
-	List  *list.List
+	Upper  *websocket.Upgrader
+	pool   *sync.Map
+	length *atomic.Int64
 }
 
 func (a *Pool) Len() int {
-	a.RLock()
-	defer a.RUnlock()
-	return a.List.Len()
+	return int(a.length.Load())
 }
 
-func (a *Pool) Range(f func(*Conn) bool) {
-	a.RLock()
-	defer a.RUnlock()
-	el := a.List.Front()
-	for el != nil {
-		if !f(el.Value.(*Conn)) {
-			break
-		}
-		el = el.Next()
-	}
-}
-
-func (a *Pool) DoLoad(key any) (*Conn, bool) {
-	var conn *Conn
-	el := a.List.Front()
-	for el != nil {
-		if conn = el.Value.(*Conn); conn.Key == key {
-			return conn, true
-		}
-		el = el.Next()
-	}
-	return nil, false
+func (a *Pool) Range(f func(any, *Conn) bool) {
+	a.pool.Range(func(key, value any) bool {
+		return f(key, value.(*Conn))
+	})
 }
 
 func (a *Pool) Load(key any) (*Conn, bool) {
-	a.RLock()
-	defer a.RUnlock()
-	return a.DoLoad(key)
-}
-
-func (a *Pool) DoConnect(c *gin.Context, key any, resHeader http.Header) (*Conn, error) {
-	ws, err := a.Upper.Upgrade(c.Writer, c.Request, resHeader)
-	return &Conn{
-		Conn: ws,
-		Pool: a,
-		Key:  key,
-	}, err
+	value, ok := a.pool.Load(key)
+	if !ok {
+		return nil, false
+	}
+	return value.(*Conn), true
 }
 
 func (a *Pool) NewConn(c *gin.Context, key any, resHeader http.Header) (*Conn, error) {
-	conn, err := a.DoConnect(c, key, resHeader)
+	var newConn = &Conn{
+		Pool: a,
+		Key:  key,
+	}
+	conn, loaded := a.pool.LoadOrStore(key, newConn)
+	if loaded {
+		return conn.(*Conn), nil
+	}
+
+	ws, err := a.Upper.Upgrade(c.Writer, c.Request, resHeader)
 	if err != nil {
 		return nil, err
 	}
-	a.Lock()
-	defer a.Unlock()
-	conn.Element = a.List.PushBack(conn)
-	return conn, nil
+	newConn.Conn = ws
+	a.length.Add(1)
+	return newConn, nil
 }
